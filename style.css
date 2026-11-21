@@ -196,6 +196,25 @@ body {
 .hint {
   display: none;
 }
+.hint.is-coach {
+  display: block;
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: 0.55rem;
+  z-index: 4;
+  margin: 0;
+  padding: 0.45rem 0.5rem;
+  font-family: "Press Start 2P", monospace;
+  font-size: 0.42rem;
+  line-height: 1.45;
+  text-align: center;
+  color: #fff8e8;
+  background: rgba(10, 14, 12, 0.88);
+  border: 3px solid var(--edge);
+  box-shadow: 2px 2px 0 #0008;
+  pointer-events: none;
+}
 
 .dock {
   position: relative;
@@ -366,6 +385,15 @@ body {
   box-shadow: 2px 2px 0 #0005;
 }
 .swing-btn { width: 100%; padding: 0.65rem 0.35rem; font-size: 0.45rem; }
+
+@keyframes coach-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+#swingBtn.coach-pulse,
+#clubPanel.coach-pulse {
+  animation: coach-pulse 0.9s steps(2, end) infinite;
+}
 
 .overlay {
   position: fixed;

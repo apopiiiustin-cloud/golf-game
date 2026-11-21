@@ -46,9 +46,10 @@
         }
       }
       const bestRound = Number.isFinite(data.bestRound) ? data.bestRound : null;
-      return { best, bestRound };
+      const tutorialDone = data.tutorialDone === true;
+      return { best, bestRound, tutorialDone };
     } catch {
-      return { best: {}, bestRound: null };
+      return { best: {}, bestRound: null, tutorialDone: false };
     }
   }
   function saveStorage() {
@@ -56,6 +57,7 @@
       localStorage.setItem(LS_KEY, JSON.stringify({
         best: state.best,
         bestRound: state.bestRound,
+        tutorialDone: state.tutorialDone,
       }));
     } catch (_) { /* ignore quota / private mode */ }
   }
@@ -792,6 +794,8 @@
   const state = {
     holeIndex: 0, strokes: 0, totalStrokes: 0,
     card: [], best: persisted.best, bestRound: persisted.bestRound,
+    tutorialDone: persisted.tutorialDone,
+    tutorial: { active: false, step: null },
     overlayMode: null, teeId: DEFAULT_TEE_ID,
     ball: { x: 0, y: 0 }, lastSafe: { x: 0, y: 0 },
     clubIndex: DEFAULT_CLUB_INDEX, shotMode: "full", phase: "idle",
@@ -1382,8 +1386,10 @@
     const d2 = dx * dx + dy * dy;
     if (d2 >= 0.0001) state.aim = Math.atan2(dy, dx);
     state.aimDist = resolveAimDist(Math.sqrt(d2));
-    if (lock) state.aimLocked = true;
-    else state.aimLocked = false;
+    if (lock) {
+      state.aimLocked = true;
+      advanceTutorial("aimLocked");
+    } else state.aimLocked = false;
     return d2 >= 0.0001;
   }
   function aimPreviewHint(p) {
@@ -1566,7 +1572,11 @@
     els.swingBtn.textContent = state.phase === "swinging" ? "stop" : "swing";
     els.swingBtn.disabled = state.phase !== "idle" && state.phase !== "swinging";
   }
-  function setHint(t) { els.hint.textContent = t; }
+  function setHint(t, { coach = false } = {}) {
+    // During tutorial, only coach / swing-stage advances may overwrite the tip.
+    if (tutorialActive() && !coach) return;
+    els.hint.textContent = t;
+  }
   function teeSetOf(teeId) {
     const id = teeId || state.teeId || DEFAULT_TEE_ID;
     return TEE_BY_ID[id] || TEE_BY_ID[DEFAULT_TEE_ID];
@@ -1635,10 +1645,98 @@
     }
     els.overlay.classList.remove("hidden");
   }
+  function tutorialActive() {
+    return state.tutorial.active;
+  }
+  function clearCoachPulse() {
+    if (els.swingBtn) els.swingBtn.classList.remove("coach-pulse");
+    if (els.clubPanel) els.clubPanel.classList.remove("coach-pulse");
+  }
+  function updateCoachPulse() {
+    clearCoachPulse();
+    if (!tutorialActive()) return;
+    const step = state.tutorial.step;
+    if (step === "power" || step === "accuracy" || step === "putt") {
+      if (els.swingBtn) els.swingBtn.classList.add("coach-pulse");
+    } else if (step === "approach") {
+      if (els.clubPanel) els.clubPanel.classList.add("coach-pulse");
+    }
+  }
+  function setTutorialStep(step) {
+    state.tutorial.step = step;
+    state.tutorial.active = step != null;
+    if (els.hint) els.hint.classList.toggle("is-coach", state.tutorial.active);
+    updateCoachPulse();
+  }
+  function finishTutorial() {
+    state.tutorialDone = true;
+    setTutorialStep(null);
+    saveStorage();
+  }
+  /** Soft coach advances: aimLocked | startSwing | beginAccuracy | shotLanded | putter | holeComplete */
+  function advanceTutorial(event) {
+    if (!tutorialActive()) return;
+    const step = state.tutorial.step;
+
+    if (event === "aimLocked" || event === "startSwing") {
+      if (step === "aim") {
+        setTutorialStep("power");
+        setHint("stop at the left end for power", { coach: true });
+      }
+      return;
+    }
+
+    if (event === "beginAccuracy") {
+      if (step === "power" || step === "aim") {
+        setTutorialStep("accuracy");
+        setHint("stop on the sweet spot for accuracy", { coach: true });
+      }
+      return;
+    }
+
+    if (event === "shotLanded") {
+      if (step === "putt" || step === "approach") return;
+      if (terrainAt(state.ball) === "green") {
+        setTutorialStep("putt");
+        setHint("green — putter · aim then swing", { coach: true });
+        return;
+      }
+      // First land off-green: one club nudge, then stay on approach.
+      setTutorialStep("approach");
+      setHint("aim · change club if too far", { coach: true });
+      return;
+    }
+
+    if (event === "putter") {
+      if (step === "putt") return;
+      setTutorialStep("putt");
+      setHint("green — putter · aim then swing", { coach: true });
+      return;
+    }
+
+    if (event === "holeComplete") {
+      finishTutorial();
+    }
+  }
+  function showTutorialIntro() {
+    showOverlay({
+      eyebrow: "hole 1",
+      title: "learn the swing",
+      text: "click to aim · swing for power then accuracy",
+      button: "play",
+      mode: "tutorial",
+    });
+  }
+  function beginTutorial() {
+    hideOverlay();
+    setTutorialStep("aim");
+    setHint("click to place your target", { coach: true });
+  }
   function startRoundWithTee(teeId) {
     applyTeeSet(teeId);
     state.holeIndex = 0;
     resetHole(false);
+    if (!state.tutorialDone) showTutorialIntro();
   }
   function nineSum(start) {
     let sum = 0, n = 0;
@@ -1706,6 +1804,7 @@
   function maybeSuggestPutter() {
     if (terrainAt(state.ball) === "green") {
       setClubIndex(CLUBS.findIndex((c) => c.id === "putter"));
+      advanceTutorial("putter");
       setHint("green — putter. aim · swing");
     }
   }
@@ -1741,7 +1840,7 @@
     }
     // On green: don't swing toward an auto-aimed cup — player must place the target.
     if (inGreen(state.ball) && !state.aimLocked) {
-      setHint("aim first — click a target");
+      setHint("aim first — click a target", { coach: true });
       return;
     }
     closeClubPicker();
@@ -1754,7 +1853,8 @@
     state.swingValue = 1;
     state.accuracyArmed = false;
     state.accuracyArmAt = 0;
-    setHint("stop at the left end for power");
+    advanceTutorial("startSwing");
+    setHint("stop at the left end for power", { coach: true });
     updateHud();
   }
   function beginAccuracyStage(power) {
@@ -1766,7 +1866,8 @@
     // Ignore the power press / ghost click until delay + leaving the power zone
     state.accuracyArmed = false;
     state.accuracyArmAt = performance.now() + ACCURACY_ARM_DELAY * 1000;
-    setHint("stop on the sweet spot for accuracy");
+    advanceTutorial("beginAccuracy");
+    setHint("stop on the sweet spot for accuracy", { coach: true });
     updateHud();
   }
   function finishAccuracySwing(band, side) {
@@ -1923,6 +2024,8 @@
     state.cam.y += (t.y - state.cam.y) * k;
   }
   function resetHole(preserveTotal = true) {
+    // Leaving hole 1 ends the soft coach if it was still running.
+    if (tutorialActive() && state.holeIndex !== 0) finishTutorial();
     const hole = currentHole();
     state.ball = { ...hole.tee }; state.lastSafe = { ...hole.tee };
     state.strokes = 0; state.phase = "idle"; state.flight = null; state.pointer = null;
@@ -1962,6 +2065,7 @@
     state.totalStrokes += state.strokes;
     const prev = state.best[state.holeIndex];
     if (prev == null || state.strokes < prev) state.best[state.holeIndex] = state.strokes;
+    if (state.holeIndex === 0 && (tutorialActive() || !state.tutorialDone)) finishTutorial();
     const hole = currentHole();
     const result = holeResultLabel(state.strokes, hole.par);
     const last = state.holeIndex >= HOLES.length - 1;
@@ -2115,6 +2219,7 @@
       retireDriverIfNeeded();
       setAimAt(cup);
       snapCam(); // frame ball + flag for next aim
+      advanceTutorial("shotLanded");
       setHint(terrain === "water" ? "water! +1 · drop" : "oob / trees! +1 · drop");
       updateHud();
       return;
@@ -2131,6 +2236,7 @@
       return;
     }
     setAimAt(cup);
+    advanceTutorial("shotLanded");
     if (terrain === "sand") setHint("blast out");
     else if (terrain === "rough") setHint("rough — more scatter");
     else if (dist(state.ball, cup) <= 32) setHint("near green — putter");
@@ -2314,6 +2420,10 @@
   els.restartBtn.addEventListener("click", () => showCardOverlay());
   els.overlayBtn.addEventListener("click", () => {
     if (state.overlayMode === "tees") return;
+    if (state.overlayMode === "tutorial") {
+      beginTutorial();
+      return;
+    }
     if (state.overlayMode === "card") {
       hideOverlay();
       return;
