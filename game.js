@@ -797,7 +797,7 @@
     holeIndex: 0, strokes: 0, totalStrokes: 0,
     card: [], best: persisted.best, bestRound: persisted.bestRound,
     tutorialDone: persisted.tutorialDone,
-    tutorial: { active: false, step: null },
+    tutorial: { active: false, step: null, clubNudged: false },
     overlayMode: null, teeId: DEFAULT_TEE_ID,
     ball: { x: 0, y: 0 }, lastSafe: { x: 0, y: 0 },
     clubIndex: DEFAULT_CLUB_INDEX, shotMode: "full", phase: "idle",
@@ -1660,13 +1660,15 @@
     const step = state.tutorial.step;
     if (step === "power" || step === "accuracy" || step === "putt") {
       if (els.swingBtn) els.swingBtn.classList.add("coach-pulse");
-    } else if (step === "approach") {
+    } else if (step === "approach" && !state.tutorial.clubNudged) {
       if (els.clubPanel) els.clubPanel.classList.add("coach-pulse");
     }
   }
   function setTutorialStep(step) {
     state.tutorial.step = step;
     state.tutorial.active = step != null;
+    if (step === "approach") state.tutorial.clubNudged = false;
+    if (step == null) state.tutorial.clubNudged = false;
     if (els.hint) els.hint.classList.toggle("is-coach", state.tutorial.active);
     updateCoachPulse();
   }
@@ -1819,6 +1821,11 @@
     }
     setClubIndex(idx);
     state.aimDist = resolveAimDist(state.aimDist);
+    // Approach coach: one club nudge — clear panel pulse after they pick
+    if (tutorialActive() && state.tutorial.step === "approach" && !state.tutorial.clubNudged) {
+      state.tutorial.clubNudged = true;
+      updateCoachPulse();
+    }
     updateHud();
     if (state.pointer && state.phase === "idle") {
       refreshHoverHint();
