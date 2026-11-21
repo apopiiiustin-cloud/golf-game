@@ -1702,7 +1702,7 @@
     if (event === "aimLocked" || event === "startSwing") {
       if (step === "aim") {
         setTutorialStep("power");
-        setHint("stop at the left end for power", { coach: true });
+        setHint("left end = power · then green spot = aim", { coach: true });
       }
       return;
     }
@@ -1710,7 +1710,8 @@
     if (event === "beginAccuracy") {
       if (step === "power" || step === "aim") {
         setTutorialStep("accuracy");
-        setHint("stop on the sweet spot for accuracy", { coach: true });
+        // Same tip as power — both beats are explained in one coach line.
+        setHint("left end = power · then green spot = aim", { coach: true });
       }
       return;
     }
@@ -1885,7 +1886,7 @@
     state.accuracyArmAt = 0;
     state.swingHoldUntil = 0;
     advanceTutorial("startSwing");
-    setHint("stop at the left end for power", { coach: true });
+    setHint("left end = power · then green spot = aim", { coach: true });
     updateHud();
   }
   function beginAccuracyStage(power) {
@@ -1898,7 +1899,7 @@
     // Ignore the power press / ghost click until delay + leaving the power zone
     state.accuracyArmed = false;
     advanceTutorial("beginAccuracy");
-    setHint("stop on the sweet spot for accuracy", { coach: true });
+    setHint("left end = power · then green spot = aim", { coach: true });
     // First tutorial accuracy: hold the needle so the tip can be read before the run
     if (teachAccuracy) {
       state.swingHoldUntil = performance.now() + TUTORIAL_ACCURACY_HOLD * 1000;
