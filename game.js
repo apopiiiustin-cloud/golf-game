@@ -31,7 +31,7 @@
     restartBtn: $("restartBtn"), reswingBtn: $("reswingBtn"),
     overlay: $("overlay"), overlayEyebrow: $("overlayEyebrow"), overlayTitle: $("overlayTitle"),
     overlayText: $("overlayText"), overlayBtn: $("overlayBtn"), teeList: $("teeList"),
-    scorecard: $("scorecard"),
+    tutorialBtn: $("tutorialBtn"), scorecard: $("scorecard"),
   };
 
   const LS_KEY = "greenDrop.v1";
@@ -1621,6 +1621,7 @@
       els.teeList.classList.add("hidden");
       els.teeList.innerHTML = "";
     }
+    if (els.tutorialBtn) els.tutorialBtn.classList.add("hidden");
     if (els.overlayBtn) els.overlayBtn.classList.remove("hidden");
   }
   function showTeeSelect() {
@@ -1645,6 +1646,7 @@
       }
       els.teeList.classList.remove("hidden");
     }
+    if (els.tutorialBtn) els.tutorialBtn.classList.remove("hidden");
     els.overlay.classList.remove("hidden");
   }
   function tutorialActive() {
@@ -1736,11 +1738,14 @@
     setTutorialStep("aim");
     setHint("click to place your target", { coach: true });
   }
-  function startRoundWithTee(teeId) {
+  function startRoundWithTee(teeId, { forceTutorial = false } = {}) {
     applyTeeSet(teeId);
     state.holeIndex = 0;
     resetHole(false);
-    if (!state.tutorialDone) showTutorialIntro();
+    if (forceTutorial || !state.tutorialDone) showTutorialIntro();
+  }
+  function startTutorialFromMenu() {
+    startRoundWithTee(state.teeId || DEFAULT_TEE_ID, { forceTutorial: true });
   }
   function nineSum(start) {
     let sum = 0, n = 0;
@@ -1782,6 +1787,7 @@
       els.teeList.classList.add("hidden");
       els.teeList.innerHTML = "";
     }
+    if (els.tutorialBtn) els.tutorialBtn.classList.add("hidden");
     if (mode === "round" || mode === "card") renderScorecard(scorecardFoot);
     else {
       els.scorecard.classList.add("hidden");
@@ -2449,6 +2455,7 @@
     closeClubPicker();
   });
   els.restartBtn.addEventListener("click", () => showCardOverlay());
+  if (els.tutorialBtn) els.tutorialBtn.addEventListener("click", () => startTutorialFromMenu());
   els.overlayBtn.addEventListener("click", () => {
     if (state.overlayMode === "tees") return;
     if (state.overlayMode === "tutorial") {
