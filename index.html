@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Green Drop · 18</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <div class="playfield">
+        <canvas id="game" width="720" height="960" aria-label="Golf"></canvas>
+
+        <div class="hud-top">
+          <div class="hud-left">
+            <div class="hud-row">
+              <button type="button" class="pix-btn card-btn" id="restartBtn">card</button>
+              <div class="flag-badge">
+                <span class="flag-pixel" aria-hidden="true"></span>
+                <span id="holeNum">1</span>
+              </div>
+            </div>
+            <div class="score-box">
+              <div>par <span id="parLabel">3</span> · <span id="lengthLabel">0</span> m</div>
+              <div>to pin <span id="toPinLabel">0</span> m</div>
+              <div>shot <span id="strokesLabel">0</span></div>
+              <div>best <span id="bestLabel">-</span></div>
+            </div>
+          </div>
+
+          <div class="hud-right">
+            <div class="wind-box">
+              <div class="wind-title">wind</div>
+              <div class="wind-arrow" id="windArrow">↗</div>
+              <div id="windLabel">1.2</div>
+            </div>
+            <div class="lie-box" id="lieBox">
+              <div class="lie-title">lie</div>
+              <canvas id="lieCanvas" width="48" height="36" aria-hidden="true"></canvas>
+              <div class="lie-name" id="lieLabel">tee</div>
+            </div>
+          </div>
+        </div>
+
+        <p class="hint" id="hint">aim · club · swing</p>
+        <span id="holeLabel" hidden></span>
+        <span id="totalLabel" hidden></span>
+        <span id="clubMeta" hidden></span>
+        <span id="swingGrade" hidden></span>
+        <div id="clubList" hidden></div>
+      </div>
+
+      <aside class="dock">
+        <canvas id="dockTrees" width="400" height="160" aria-hidden="true"></canvas>
+        <div class="dock-ui">
+          <div class="dock-left">
+            <div class="ctrl-row club-row">
+              <button type="button" class="pix-btn sm shot-mode-btn" id="shotModeBtn" aria-label="shot mode">full</button>
+              <button type="button" class="club-panel" id="clubPanel" aria-haspopup="listbox" aria-expanded="false" aria-controls="clubList">
+                <img class="club-head" id="clubIcon" src="assets/clubs/club-swedge.png" alt="" aria-hidden="true">
+                <div class="club-name" id="clubName">s. wedge</div>
+              </button>
+            </div>
+          </div>
+          <div class="dock-right">
+            <canvas id="swingMeter" width="168" height="48" aria-hidden="true"></canvas>
+            <button type="button" class="pix-btn orange swing-btn" id="swingBtn">swing</button>
+          </div>
+        </div>
+      </aside>
+
+      <button type="button" class="ghost-btn" id="reswingBtn" hidden>redo</button>
+
+      <div class="overlay hidden" id="overlay">
+        <div class="card">
+          <p class="eyebrow" id="overlayEyebrow">hole complete</p>
+          <h2 id="overlayTitle">nice!</h2>
+          <p id="overlayText"></p>
+          <div id="scorecard" class="scorecard hidden" aria-label="scorecard"></div>
+          <div id="teeList" class="tee-list hidden" aria-label="tee select"></div>
+          <button type="button" class="pix-btn orange" id="overlayBtn">next hole</button>
+        </div>
+      </div>
+    </div>
+    <script src="game.js?v=verify1"></script>
+  </body>
+</html>
