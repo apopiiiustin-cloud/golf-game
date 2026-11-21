@@ -88,21 +88,23 @@
   function fmtMeters(px) { return `${Math.round(pxToM(px))} m`; }
 
   // Classic 14-club bag (ranges in meters): loft rises as range falls; bounce falls on wedges.
-  // All clubs: click places the target anywhere within range; power tip timing scales that carry.
+  // Woods/irons/wedges: aim sets direction; carry stays near full club range (±CLUB_AIM_MARGIN_M),
+  // then power tip timing scales that carry. Putter/chip/flop: click places target within range.
+  const CLUB_AIM_MARGIN_M = 10;
   const CLUBS = [
-    { id: "driver", name: "driver", rangeM: 230, scatter: 0.50, loft: 0.10, bounce: 0.9, fixedCarry: false },
-    { id: "wood3", name: "wood 3", rangeM: 210, scatter: 0.45, loft: 0.22, bounce: 0.7, fixedCarry: false },
-    { id: "wood5", name: "wood 5", rangeM: 195, scatter: 0.40, loft: 0.26, bounce: 0.6, fixedCarry: false },
-    { id: "iron3", name: "3 iron", rangeM: 180, scatter: 0.35, loft: 0.30, bounce: 0.5, fixedCarry: false },
-    { id: "iron4", name: "4 iron", rangeM: 170, scatter: 0.30, loft: 0.35, bounce: 0.4, fixedCarry: false },
-    { id: "iron5", name: "5 iron", rangeM: 160, scatter: 0.25, loft: 0.40, bounce: 0.3, fixedCarry: false },
-    { id: "iron6", name: "6 iron", rangeM: 150, scatter: 0.20, loft: 0.44, bounce: 0.2, fixedCarry: false },
-    { id: "iron7", name: "7 iron", rangeM: 140, scatter: 0.15, loft: 0.49, bounce: 0.1, fixedCarry: false },
-    { id: "iron8", name: "8 iron", rangeM: 130, scatter: 0.10, loft: 0.54, bounce: 0.05, fixedCarry: false },
-    { id: "iron9", name: "9 iron", rangeM: 120, scatter: 0.05, loft: 0.58, bounce: 0.02, fixedCarry: false },
-    { id: "pwedge", name: "p. wedge", rangeM: 105, scatter: 0.025, loft: 0.70, bounce: 0.01, fixedCarry: false },
-    { id: "swedge", name: "s. wedge", rangeM: 80, scatter: 0.02, loft: 0.85, bounce: 0.005, fixedCarry: false },
-    { id: "lwedge", name: "l. wedge", rangeM: 60, scatter: 0.015, loft: 0.95, bounce: 0.002, fixedCarry: false },
+    { id: "driver", name: "driver", rangeM: 230, scatter: 0.50, loft: 0.10, bounce: 0.9, fixedCarry: true },
+    { id: "wood3", name: "wood 3", rangeM: 210, scatter: 0.45, loft: 0.22, bounce: 0.7, fixedCarry: true },
+    { id: "wood5", name: "wood 5", rangeM: 195, scatter: 0.40, loft: 0.26, bounce: 0.6, fixedCarry: true },
+    { id: "iron3", name: "3 iron", rangeM: 180, scatter: 0.35, loft: 0.30, bounce: 0.5, fixedCarry: true },
+    { id: "iron4", name: "4 iron", rangeM: 170, scatter: 0.30, loft: 0.35, bounce: 0.4, fixedCarry: true },
+    { id: "iron5", name: "5 iron", rangeM: 160, scatter: 0.25, loft: 0.40, bounce: 0.3, fixedCarry: true },
+    { id: "iron6", name: "6 iron", rangeM: 150, scatter: 0.20, loft: 0.44, bounce: 0.2, fixedCarry: true },
+    { id: "iron7", name: "7 iron", rangeM: 140, scatter: 0.15, loft: 0.49, bounce: 0.1, fixedCarry: true },
+    { id: "iron8", name: "8 iron", rangeM: 130, scatter: 0.10, loft: 0.54, bounce: 0.05, fixedCarry: true },
+    { id: "iron9", name: "9 iron", rangeM: 120, scatter: 0.05, loft: 0.58, bounce: 0.02, fixedCarry: true },
+    { id: "pwedge", name: "p. wedge", rangeM: 105, scatter: 0.025, loft: 0.70, bounce: 0.01, fixedCarry: true },
+    { id: "swedge", name: "s. wedge", rangeM: 80, scatter: 0.02, loft: 0.85, bounce: 0.005, fixedCarry: true },
+    { id: "lwedge", name: "l. wedge", rangeM: 60, scatter: 0.015, loft: 0.95, bounce: 0.002, fixedCarry: true },
     { id: "putter", name: "putter", rangeM: 20, scatter: 0.01, loft: 0, bounce: 0, fixedCarry: false },
   ];
   const DEFAULT_CLUB_INDEX = CLUBS.findIndex((c) => c.id === "swedge");
@@ -1289,10 +1291,23 @@
     if (club.id === currentClub().id) return !!effectiveShot(club).fixedCarry;
     return !!club.fixedCarry;
   }
-  /** Effective aim distance: click distance capped by club range (all clubs). */
+  /** Max reach in px: stock club range, plus aim margin for fixed-carry clubs. */
+  function clubMaxReach(club = currentClub()) {
+    const r = clubRangeOf(club);
+    const fixed = club.id === currentClub().id ? clubFixedCarry(club) : !!club.fixedCarry;
+    return fixed ? r + mToPx(CLUB_AIM_MARGIN_M) : r;
+  }
+  /**
+   * Effective aim distance.
+   * Fixed-carry clubs: near full club range, click may trim/extend within ±CLUB_AIM_MARGIN_M.
+   * Putter/chip/flop: click distance capped by club range.
+   */
   function resolveAimDist(clickDist) {
     const range = clubRange();
-    if (clubFixedCarry(currentClub())) return range;
+    if (clubFixedCarry(currentClub())) {
+      const margin = mToPx(CLUB_AIM_MARGIN_M);
+      return clamp(clickDist, Math.max(0, range - margin), range + margin);
+    }
     return Math.min(Math.max(clickDist, 0), range);
   }
   /** Tip = full club; early/late power stop shortens carry gently. Putter keeps full 0–1. */
@@ -1307,7 +1322,7 @@
     let best = null;
     for (const club of CLUBS) {
       if (!clubAllowed(club)) continue;
-      if (clubRangeOf(club) + 0.5 < d) continue;
+      if (clubMaxReach(club) + 0.5 < d) continue;
       if (!best || club.rangeM < best.rangeM) best = club;
     }
     return best;
@@ -1320,7 +1335,7 @@
     }, null);
   }
   function clubSuggestPhrase(d) {
-    if (d <= clubRange() + 0.5) return null;
+    if (d <= clubMaxReach() + 0.5) return null;
     const best = bestClubFor(d);
     if (best) {
       if (best.id === currentClub().id) return null;
@@ -1360,7 +1375,7 @@
     return false;
   }
   function inClubRange(target) {
-    return dist(state.ball, target) <= clubRange() + 0.5;
+    return dist(state.ball, target) <= clubMaxReach() + 0.5;
   }
   function nearestTargetHit(p, maxDist = 12) {
     const targets = currentHole().targets || [];
@@ -1399,8 +1414,8 @@
     const club = currentClub();
     const mode = activeShotMode(club);
     if (clubFixedCarry(club)) {
-      const full = fmtMeters(clubRange());
-      return `${full} · full ${club.name}`;
+      const resolved = resolveAimDist(raw);
+      return `${fmtMeters(resolved)} · ${club.name}`;
     }
     const d = fmtMeters(raw);
     const modeBit = mode === "full" ? "" : ` · ${mode}`;
@@ -1907,7 +1922,7 @@
     state.swingLabel = band.name;
     state.swingSide = side;
     state.swingBias = band.bias != null ? band.bias : 0.65;
-    // aimDist = click target; swingPower shortens if tip was missed
+    // Fixed-carry: aimDist ≈ club range (±margin); swingPower shortens if tip was missed
     const range = state.aimDist * state.swingPower;
     const intended = {
       x: state.ball.x + Math.cos(state.aim) * range,
@@ -2171,7 +2186,7 @@
     const club = currentClub();
     const shot = effectiveShot(club);
     const from = state.ball;
-    const maxRange = clubRange() * clamp(state.swingPower, 0, 1);
+    const maxRange = clubMaxReach(club) * clamp(state.swingPower, 0, 1);
     const intendedDist = Math.min(dist(from, intended), maxRange);
 
     // Shot axis: ball → intended (fallback to aim * intendedDist)
