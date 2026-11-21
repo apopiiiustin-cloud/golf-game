@@ -167,6 +167,8 @@
   const SWING_ACCURACY_SPEED_MUL = 1.2;
   const POWER_OVERFLOW = 0.85; // past left tip without press → slightly under max
   const ACCURACY_ARM_DELAY = 0.28; // seconds after power before accuracy can stop
+  // Soft coach: freeze the meter after power so the accuracy tip can be read
+  const TUTORIAL_ACCURACY_HOLD = 1.35; // seconds
 
   // Screen coords: +x right, +y down. Arrows map to wind push angle.
   const WIND_DIR_ANGLE = {
@@ -801,7 +803,7 @@
     clubIndex: DEFAULT_CLUB_INDEX, shotMode: "full", phase: "idle",
     swingStage: "power", swingPos: 1, swingDir: 1, swingPower: 0, swingValue: 0.5,
     swingFactor: 0.22, swingLabel: "—", swingSide: 1, swingBias: 0,
-    accuracyArmed: false, accuracyArmAt: 0,
+    accuracyArmed: false, accuracyArmAt: 0, swingHoldUntil: 0,
     pointer: null, flight: null,
     facing: 1, aim: -Math.PI / 2, aimDist: 0, aimLocked: false, courseDirty: true,
     cam: { x: 0, y: 0 },
@@ -1853,11 +1855,13 @@
     state.swingValue = 1;
     state.accuracyArmed = false;
     state.accuracyArmAt = 0;
+    state.swingHoldUntil = 0;
     advanceTutorial("startSwing");
     setHint("stop at the left end for power", { coach: true });
     updateHud();
   }
   function beginAccuracyStage(power) {
+    const teachAccuracy = tutorialActive() && (state.tutorial.step === "power" || state.tutorial.step === "aim");
     state.swingPower = resolveSwingPower(power);
     state.swingStage = "accuracy";
     // Fresh run from the left so aim is a clear second beat (not glued to the power press)
@@ -1865,12 +1869,27 @@
     state.swingPos = 0.001;
     // Ignore the power press / ghost click until delay + leaving the power zone
     state.accuracyArmed = false;
-    state.accuracyArmAt = performance.now() + ACCURACY_ARM_DELAY * 1000;
     advanceTutorial("beginAccuracy");
     setHint("stop on the sweet spot for accuracy", { coach: true });
+    // First tutorial accuracy: hold the needle so the tip can be read before the run
+    if (teachAccuracy) {
+      state.swingHoldUntil = performance.now() + TUTORIAL_ACCURACY_HOLD * 1000;
+      state.accuracyArmAt = 0;
+    } else {
+      state.swingHoldUntil = 0;
+      state.accuracyArmAt = performance.now() + ACCURACY_ARM_DELAY * 1000;
+    }
     updateHud();
   }
+  function releaseSwingHold() {
+    if (!state.swingHoldUntil) return false;
+    state.swingHoldUntil = 0;
+    state.accuracyArmed = false;
+    state.accuracyArmAt = performance.now() + ACCURACY_ARM_DELAY * 1000;
+    return true;
+  }
   function finishAccuracySwing(band, side) {
+    state.swingHoldUntil = 0;
     state.swingFactor = band.factor;
     state.swingLabel = band.name;
     state.swingSide = side;
@@ -1889,6 +1908,11 @@
       // Left tip (pos≈0) = max; further right = weaker
       const power = clamp(1 - state.swingPos, 0, 1);
       beginAccuracyStage(power);
+      return;
+    }
+    // Tutorial hold: next press skips the read pause and starts the accuracy run
+    if (state.swingHoldUntil && performance.now() < state.swingHoldUntil) {
+      releaseSwingHold();
       return;
     }
     // Don't finish on the power press / ghost click / key-repeat
@@ -2032,7 +2056,7 @@
     state.shotMode = "full";
     state.swingStage = "power"; state.swingPos = 1; state.swingDir = 1; state.swingPower = 0;
     state.swingLabel = "—"; state.swingFactor = 0.22; state.swingSide = 1; state.swingBias = 0;
-    state.accuracyArmed = false; state.accuracyArmAt = 0;
+    state.accuracyArmed = false; state.accuracyArmAt = 0; state.swingHoldUntil = 0;
     const teeDist = dist(hole.tee, hole.cup);
     const best = bestClubFor(teeDist);
     const pick = best || CLUBS.find((c) => c.id === "driver");
@@ -3126,6 +3150,14 @@
 
   function updateSwing(dt) {
     if (state.phase !== "swinging") return;
+    // Soft coach pause after power — needle stays put while accuracy tip is shown
+    if (state.swingHoldUntil) {
+      if (performance.now() < state.swingHoldUntil) {
+        state.swingValue = state.swingPos;
+        return;
+      }
+      releaseSwingHold();
+    }
     const stageMul = state.swingStage === "accuracy" ? SWING_ACCURACY_SPEED_MUL : 1;
     const speed = SWING_SPEED * swingSpeedMul() * stageMul;
     state.swingPos += state.swingDir * dt * speed;
